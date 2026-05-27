@@ -175,3 +175,169 @@ sequenceDiagram
 | **Model** | UTXO | Cell (generalized UTXO) |
 
 On CKB, contracts are written in **real programming languages**, allowing complex transactions and full decentralized applications — while keeping the security benefits of the UTXO-style model.
+
+# Cell Model — Notes
+
+## The Core Idea
+
+**Cells are immutable.** Once on-chain, a Cell can never be changed. To "update" data, you destroy the old Cell and create a new one in its place. This process is called **Consumption**.
+
+## Cell Lifecycle
+
+```mermaid
+graph LR
+    A[Create Cell] --> B[Live Cell]
+    B -->|Consumed in a tx| C[Dead Cell]
+    C --> D[Gone forever<br/>cannot be referenced again]
+```
+
+- **Live Cell** — exists on-chain, unspent, available to be consumed
+- **Dead Cell** — already consumed, now historical record only
+- Each Cell can be consumed **exactly once**
+
+## What a Transaction Actually Does
+
+A CKB transaction is just a declaration:
+
+> "Consume these Live Cells → create these new Cells in their place."
+
+The network validates by running:
+1. **Every Lock Script** on every input Cell → must return `0` (spender authorized)
+2. **Every Type Script** involved → must return `0` (state transition legal)
+
+If both pass: inputs flip Live → Dead, outputs become new Live Cells.
+
+```mermaid
+graph LR
+    subgraph INPUTS [Live Cells - Inputs]
+        I1[Cell A]
+        I2[Cell B]
+    end
+    subgraph VALIDATION [Validation]
+        L[Lock Scripts return 0?]
+        T[Type Scripts return 0?]
+    end
+    subgraph OUTPUTS [New Live Cells - Outputs]
+        O1[Cell C]
+        O2[Cell D]
+    end
+    INPUTS --> VALIDATION
+    VALIDATION -->|All pass| OUTPUTS
+    INPUTS -.->|Flip to Dead| INPUTS
+```
+
+---
+
+## First-Class Assets — The Big Security Property
+
+This is what makes CKB fundamentally different from Ethereum.
+
+### Ethereum model
+Your USDC isn't really *yours*. It's an entry in the USDC contract's mapping:
+```
+balances[your_address] = 1000
+```
+The contract owns the tokens. You have a *claim*. If the contract is hacked or upgraded maliciously → balance gone.
+
+### CKB model
+Your tokens live in **Cells locked by your Lock Script**. Your Lock Script says: *"only the holder of this private key can consume this Cell."*
+
+- **Type Script** = rules about how tokens move (supply, transfer rules)
+- **Lock Script** = who controls the Cell
+
+A buggy Type Script **cannot bypass your Lock**. Contracts enforce *rules*; they don't *hold* your stuff.
+
+```mermaid
+graph TD
+    subgraph ETH [Ethereum]
+        EC[USDC Contract] -->|owns the tokens| EM["mapping: balances[you] = 1000"]
+        EM -.->|"if hacked: gone"| EX[Loss]
+    end
+    subgraph CKB [CKB]
+        CL[Your Lock Script] -->|guards| CC["Cell with tokens"]
+        CT[Type Script] -.->|defines rules only| CC
+        CC -->|"only your key consumes"| CY[Safe]
+    end
+```
+
+### The trade-off: State Rent
+Because your assets occupy bytes on-chain (Cell capacity = storage quota = locked CKB), you pay a **continuous upkeep cost** for the bytes you occupy. You're not paying once — you're paying forever for the space.
+
+> Note: In practice this is implemented as **secondary issuance** — holders who don't lock CKB in the Nervos DAO get diluted over time. Functionally equivalent to state rent.
+
+---
+
+## Flexible Transaction Fees
+
+**Ethereum:** Sender always pays gas → onboarding problem (need ETH first).
+
+**CKB:** *Any party* can attach the CKBytes that pay the fee.
+
+| Who pays | Use case |
+|---|---|
+| Sender | Normal case |
+| Receiver | Claiming an airdrop |
+| Third party | Sponsored / gasless transactions |
+
+**How it works:** A tx just needs `sum(input capacities) ≥ sum(output capacities) + fee`. The protocol doesn't care *whose* inputs they are, as long as the math works and every Lock Script signs off.
+
+---
+
+## Scalability — Three Distinct Properties
+
+### 1. Off-chain computation, on-chain verification
+- **Ethereum:** Every node runs the computation (expensive)
+- **CKB:** The tx creator computes the new state *off-chain*; the network just *verifies* the result by running scripts in validation mode
+- Verifying ≪ computing from scratch (same idea behind ZK rollups, but at base layer)
+
+### 2. Parallel execution
+- **Ethereum:** Txs run sequentially (might touch same storage)
+- **CKB:** Every tx declares *exactly* which Cells it touches — no hidden side effects
+- If tx A's inputs and tx B's inputs don't overlap → validate **simultaneously** on different CPU cores
+- Modern hardware has many cores → CKB uses them
+
+### 3. Batched operations
+- One tx can have many inputs/outputs with many Type Scripts
+- Settle 50 DEX trades in one tx. Mint + transfer + burn in one tx.
+- Fee scales with **size**, not with **number of operations**
+
+```mermaid
+graph TD
+    S((Cell Model<br/>Scalability))
+    S --> OC[Off-chain computation<br/>On-chain verification]
+    S --> PE[Parallel execution<br/>across CPU cores]
+    S --> BO[Batched operations<br/>in single tx]
+```
+
+---
+
+## How This Connects to Earlier Concepts
+
+| You learned | This page explains |
+|---|---|
+| Cell has `lock` + optional `type` | *Why* the split matters → first-class assets |
+| Tx has `inputs` and `outputs` | Inputs become Dead, outputs become new Live Cells |
+| Tx has `capacity` math | Why anyone can pay fees — it's just sum balancing |
+| Scripts return 0 or non-0 | This is what gates Consumption |
+
+**Previous page told you what a Cell *looks like*. This page told you what a Cell *does*.**
+
+---
+
+## Quick Recall Checklist
+
+- [ ] What does "Cell is immutable" mean in practice?
+- [ ] What's the difference between a Live and Dead Cell?
+- [ ] Why are CKB assets "first-class" but Ethereum assets aren't?
+- [ ] What is state rent, and why does it exist?
+- [ ] Who can pay tx fees on CKB?
+- [ ] Name the three scalability properties of the Cell Model.
+- [ ] Why can CKB execute transactions in parallel but Ethereum can't?
+
+---
+
+## Caveats Worth Remembering
+
+1. **State rent ≠ literal recurring charge.** It's implemented as secondary issuance + Nervos DAO dilution offset.
+2. **"Off-chain computation" ≠ rollup or L2.** It just means tx creators compute the proposed new state themselves.
+3. **Parallel execution has limits.** If many txs fight for the same Cell, you still serialize. Good protocol design uses Cells that don't bottleneck.
