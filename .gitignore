@@ -1,0 +1,23 @@
+# Rust / Cargo build output (catch-all, in case a project lacks its own .gitignore)
+target/
+**/target/
+
+# Backtrace / debug
+*.pdb
+
+# Secrets — CKB devnet/account keys. NEVER commit private keys.
+*.key
+*.pem
+miner.key
+privkey
+*.privkey
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.idea/
+*.swp
+*~

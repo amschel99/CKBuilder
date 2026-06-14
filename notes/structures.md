@@ -2,7 +2,7 @@
 
 this week was mostly structure. week1 i just got the general idea, now i actually went thru each field one by one. writing it down cause i forget otherwise. also i kept comparing to btc/eth in my head the whole time, thats the only way half of it makes sense to me so im putting that here too.
 
-prob some of this is wrong, fix later if i find out.
+
 
 ---
 

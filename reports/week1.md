@@ -1,7 +1,5 @@
 ## Builder Track Weekly Report — Week 1
 
-**Name:** Ali Jouahri  
-**Week Ending:** 05-31-2026
 
 ### Courses Completed
 
