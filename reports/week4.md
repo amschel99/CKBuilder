@@ -1,7 +1,6 @@
 # Week 4 Progress
 
-**Name:** Ali Jouahri
-**Week Ending:** 06-21-2026
+
 
 ## What I worked on
 
